@@ -1,34 +1,51 @@
 from flask import Flask, jsonify, request
 import threading
+from utils import cluster_info
+from werkzeug.serving import make_server
 
 
-def run_server(port, node):
-    local_app = Flask(__name__)
+class Server:
+    def __init__(self, node):
+        self.node = node
+        self.port = cluster_info.get_port_by_node_id(node.id)
+        self.local_app = Flask(__name__)
+        self.server = None
+        self.setup_routes()
 
-    @local_app.route('/map', methods=['GET'])
-    def get():
-        node.logger.log('GET request received')
-        result = node.handle_get()
-        return jsonify(result), 200
+    def terminate(self):
+        if self.server:
+            self.server.shutdown()
+            self.server.server_close()
+            self.server = None
 
-    @local_app.route('/map', methods=['PATCH'])
-    def patch():
-        node.logger.log('PATCH request received')
-        updates = request.get_json()
-        node.handle_patch(updates)
-        return jsonify({}), 202
+    def setup_routes(self):
+        @self.local_app.route('/map', methods=['GET'])
+        def get():
+            self.node.logger.log('GET request received')
+            result = self.node.handle_get()
+            return jsonify(result), 200
 
-    @local_app.route('/map', methods=['PUT'])
-    def sync():
-        node.logger.log('SYNC request received')
-        updates = request.get_json()
-        timestamp = request.args.get('timestamp')
-        node.handle_sync(updates, timestamp)
-        return jsonify({}), 202
+        @self.local_app.route('/map', methods=['PATCH'])
+        def patch():
+            self.node.logger.log('PATCH request received')
+            updates = request.get_json()
+            self.node.handle_patch(updates)
+            return jsonify({}), 202
 
-    print(f'Starting server at address: localhost:{port}')
-    local_app.run(port=port, debug=False)
+        @self.local_app.route('/map', methods=['PUT'])
+        def sync():
+            self.node.logger.log('SYNC request received')
+            updates = request.get_json()
+            timestamp = request.args.get('timestamp')
+            self.node.handle_sync(updates, timestamp)
+            return jsonify({}), 202
 
+    def run(self):
+        self.node.logger.log(f'Starting server at address: localhost:{self.port}')
+        self.server = make_server('localhost', self.port, self.local_app)
+        self.server.serve_forever()
+        self.node.logger.log(f'Server stopped at address: localhost:{self.port}')
 
-def run_server_as_daemon(port, node):
-    threading.Thread(target=run_server, args=(port, node), daemon=True).start()
+    def run_as_daemon(self):
+        thread = threading.Thread(target=self.run, daemon=True)
+        thread.start()

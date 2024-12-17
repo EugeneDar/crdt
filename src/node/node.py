@@ -1,7 +1,7 @@
 import threading
 
 from client.http_client import Client
-from server.http_server import run_server_as_daemon, run_server
+from server.http_server import Server
 from .storage import Storage
 from .timestamp import LamportTimestamp
 from utils import cluster_info
@@ -13,28 +13,30 @@ class Node:
         self.id = id
         self.storage = Storage()
         # todo use vector clock
-        self.timestamp = LamportTimestamp(0)
-        self.http_client = Client()
+        self.timestamp = LamportTimestamp()
         self.lock = threading.Lock()
         self.logger = Logger(id)
+        self.http_client = Client()
+        self.http_server = Server(self)
 
-        run_server_as_daemon(cluster_info.get_port_by_node_id(id), self)
-        # run_server(cluster_info.get_port_by_node_id(id), self)
+        self.http_server.run_as_daemon()
+
+    def terminate(self):
+        self.http_client.terminate()
+        self.http_server.terminate()
 
     def handle_get(self):
-        # self.logger.log('GET request received')
         with self.lock:
             return self.storage.get_all()
 
     def handle_patch(self, updates):
-        # self.logger.log(f'PATCH request received')
         with self.lock:
             self.timestamp.increment()
             self.broadcast(updates, self.timestamp)
 
     def handle_sync(self, updates, timestamp):
-        # self.logger.log(f'SYNC request received')
         timestamp = LamportTimestamp.from_string(timestamp)
+        self.timestamp.update(timestamp)
         with self.lock:
             for key, value in updates.items():
                 self.storage.put(key, value, timestamp)

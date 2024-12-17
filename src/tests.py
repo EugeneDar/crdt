@@ -12,30 +12,39 @@ from utils.constants import *
 
 def create_nodes():
     nodes = [Node(node_id) for node_id in cluster_info.get_all_node_ids()]
-    time.sleep(3)  # todo use better way to wait for all nodes to start
+    time.sleep(2)
     return nodes
 
 
-def stop_all_nodes():
-    time.sleep(7)  # todo use better way to wait for all nodes to stop
+def stop_all_nodes(nodes):
+    for node in nodes:
+        node.terminate()
+    time.sleep(2)
+    print("All nodes are stopped")
 
 
-def test_one_node_rw():
-    cluster_info.init_cluster_nodes(1)
+@pytest.mark.parametrize("nodes_count", [
+    (1),
+    (2), (3), (4),
+    (5), (6), (7),
+])
+def test_nodes_rw(nodes_count):
+    cluster_info.init_cluster_nodes(nodes_count)
     nodes = create_nodes()
+    nodes_addresses = cluster_info.get_all_addresses()
 
     client = Client()
 
-    client.send_patch_request(cluster_info.get_node_address('0'), {'key': 'a', 'value': 1})
+    client.send_patch_request(random.choice(nodes_addresses), {'key': 'a', 'value': 1})
     time.sleep(BROADCAST_TIME)
-    success, response = client.send_get_request(cluster_info.get_node_address('0'))
+    success, response = client.send_get_request(random.choice(nodes_addresses))
     assert success
     assert response == {'key': 'a', 'value': 1}
 
-    client.send_patch_request(cluster_info.get_node_address('0'), {'key2': 'b', 'value': 2})
+    client.send_patch_request(random.choice(nodes_addresses), {'key2': 'b', 'value': 2})
     time.sleep(BROADCAST_TIME)
-    success, response = client.send_get_request(cluster_info.get_node_address('0'))
+    success, response = client.send_get_request(random.choice(nodes_addresses))
     assert success
     assert response == {'key': 'a', 'key2': 'b', 'value': 2}
 
-    stop_all_nodes()
+    stop_all_nodes(nodes)

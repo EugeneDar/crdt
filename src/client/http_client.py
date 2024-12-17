@@ -9,22 +9,30 @@ class Client:
         self.lock = threading.Lock()
         self.request_queue = queue.Queue()
         self.delayed_requests = queue.Queue()
+        self.stop_event = threading.Event()
 
         self._init_daemons()
+
+    def terminate(self):
+        self.stop_event.set()
 
     def _init_daemons(self):
         threading.Thread(target=self._delay_requests, daemon=True).start()
         threading.Thread(target=self._run_sync_requests, daemon=True).start()
 
     def _delay_requests(self):
-        while True:
-            time.sleep(1)
+        while not self.stop_event.is_set():
+            self.stop_event.wait(1)
+            if self.stop_event.is_set():
+                break
             delayed_count = self.delayed_requests.qsize()
             for _ in range(delayed_count):
                 request = self.delayed_requests.get(block=True)
                 self.queue_sync_request(*request)
 
     def _run_sync_requests(self):
+        # todo think about correct way to stop this thread
+        # but it's not critical for now
         while True:
             request = self.request_queue.get(block=True)
             success, _ = self._send_sync_request(*request)
