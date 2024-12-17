@@ -5,8 +5,6 @@ class Storage:
     def __init__(self):
         self.data = {}
 
-        # todo add field for not applied updates
-
     def get(self, key):
         state = self.data.get(key)
         return state.value, state.timestamp if state else None, None

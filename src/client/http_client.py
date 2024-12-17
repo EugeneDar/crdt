@@ -31,7 +31,7 @@ class Client:
                 self.queue_sync_request(*request)
 
     def _run_sync_requests(self):
-        # todo think about correct way to stop this thread
+        # think about correct way to stop this thread
         # but it's not critical for now
         while True:
             request = self.request_queue.get(block=True)

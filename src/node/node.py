@@ -12,7 +12,6 @@ class Node:
     def __init__(self, id):
         self.id = id
         self.storage = Storage()
-        # todo use vector clock
         self.timestamp = LamportTimestamp()
         self.lock = threading.Lock()
         self.logger = Logger(id)

@@ -1,3 +1,5 @@
 ### How to test
 
-todo
+```bash
+bash run_tests.sh
+```
