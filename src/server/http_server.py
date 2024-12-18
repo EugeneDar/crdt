@@ -10,6 +10,9 @@ class Server:
         self.port = cluster_info.get_port_by_node_id(node.id)
         self.local_app = Flask(__name__)
         self.server = None
+        self.sync_enabled_event = threading.Event()  # if set, sync requests are allowed
+
+        self.sync_enabled_event.set()
         self.setup_routes()
 
     def terminate(self):
@@ -17,6 +20,12 @@ class Server:
             self.server.shutdown()
             self.server.server_close()
             self.server = None
+
+    def disable_sync(self):
+        self.sync_enabled_event.clear()
+
+    def enable_sync(self):
+        self.sync_enabled_event.set()
 
     def setup_routes(self):
         @self.local_app.route('/map', methods=['GET'])
@@ -35,6 +44,10 @@ class Server:
         @self.local_app.route('/map', methods=['PUT'])
         def sync():
             self.node.logger.log('SYNC request received')
+            if not self.sync_enabled_event.is_set():
+                self.node.logger.log('SYNC is currently disabled')
+                return jsonify({'error': 'Sync is currently disabled'}), 403
+
             updates = request.get_json()
             timestamp = request.args.get('timestamp')
             source_id = request.args.get('source_id')

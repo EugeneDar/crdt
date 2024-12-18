@@ -116,6 +116,81 @@ def test_consistency(patches_count, nodes_count):
     stop_all_nodes(nodes)
 
 
-def test_network_separation():
-    # todo implement this test
-    raise NotImplementedError
+@pytest.mark.parametrize('execution_number', range(5))
+def test_network_separation(execution_number):
+    cluster_info.init_cluster_nodes(2)
+    nodes = create_nodes()
+    nodes_addresses = cluster_info.get_all_addresses()
+
+    client = Client()
+
+    client.send_patch_request(random.choice(nodes_addresses), {'key_1': 'value_1'})
+    time.sleep(BROADCAST_TIME)
+
+    print("Disabling sync")
+    nodes[0].disable_sync()
+
+    client.send_patch_request(nodes_addresses[0], {'key_2': 'value_2'})
+    client.send_patch_request(nodes_addresses[1], {'key_3': 'value_3'})
+    time.sleep(3 * BROADCAST_TIME)
+
+    success_0, response_0 = client.send_get_request(nodes_addresses[0])
+    success_1, response_1 = client.send_get_request(nodes_addresses[1])
+    assert success_0
+    assert success_1
+    assert response_0 == {'key_1': 'value_1', 'key_2': 'value_2'}
+    assert response_1 == {'key_1': 'value_1', 'key_3': 'value_3'}
+
+    print("Enabling sync")
+    nodes[0].enable_sync()
+    time.sleep(3 * BROADCAST_TIME)
+
+    success_0, response_0 = client.send_get_request(nodes_addresses[0])
+    success_1, response_1 = client.send_get_request(nodes_addresses[1])
+    assert success_0
+    assert success_1
+    assert response_0 == {'key_1': 'value_1', 'key_2': 'value_2', 'key_3': 'value_3'}
+    assert response_1 == {'key_1': 'value_1', 'key_2': 'value_2', 'key_3': 'value_3'}
+
+    stop_all_nodes(nodes)
+
+
+@pytest.mark.parametrize("patches_count,nodes_count", [
+    (10, 3), (10, 10),
+    (100, 3), (100, 10),
+])
+def test_random_temporary_network_separations(patches_count, nodes_count):
+    cluster_info.init_cluster_nodes(nodes_count)
+    nodes = create_nodes()
+    nodes_addresses = cluster_info.get_all_addresses()
+
+    clients = [Client() for _ in range(nodes_count)]
+
+    def do_random_patches(client, node, patches_count, nodes_count):
+        node_address = cluster_info.get_node_address(node.id)
+        for _ in range(patches_count):
+            random_patch = {
+                f'key_{random.randint(0, nodes_count)}': f'value_{random.randint(0, nodes_count)}'
+            }
+            if random.random() < 0.1:
+                node.disable_sync()
+                client.send_patch_request(node_address, random_patch)
+                time.sleep(random.random() * 1.5)
+                node.enable_sync()
+            else:
+                client.send_patch_request(node_address, random_patch)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=nodes_count) as executor:
+        for client, node in zip(clients, nodes):
+            executor.submit(do_random_patches, client, node, patches_count, nodes_count)
+
+    wait_for_broadcast_time = max(1, patches_count * nodes_count / 10) * BROADCAST_TIME
+    time.sleep(wait_for_broadcast_time)
+
+    _, some_node_data = clients[0].send_get_request(random.choice(nodes_addresses))
+
+    for address in nodes_addresses:
+        _, node_data = clients[0].send_get_request(address)
+        assert node_data == some_node_data
+
+    stop_all_nodes(nodes)

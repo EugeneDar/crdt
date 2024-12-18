@@ -8,11 +8,19 @@ class Client:
         self.request_queue = queue.Queue()
         self.delayed_requests = queue.Queue()
         self.stop_event = threading.Event()
+        self.sync_enabled_event = threading.Event()  # if set, sync requests are allowed
 
+        self.sync_enabled_event.set()
         self._init_daemons()
 
     def terminate(self):
         self.stop_event.set()
+
+    def disable_sync(self):
+        self.sync_enabled_event.clear()
+
+    def enable_sync(self):
+        self.sync_enabled_event.set()
 
     def _init_daemons(self):
         threading.Thread(target=self._delay_requests, daemon=True).start()
@@ -63,6 +71,7 @@ class Client:
         self.request_queue.put((address, data, timestamp, source_id))
 
     def _send_sync_request(self, address, data, timestamp, source_id):
+        self.sync_enabled_event.wait()  # if sync is disabled, don't send requests
         try:
             headers = {'Content-Type': 'application/json'}
             params = {'timestamp': timestamp, 'source_id': source_id}
