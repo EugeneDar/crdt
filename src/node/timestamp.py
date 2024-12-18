@@ -8,10 +8,12 @@ class LamportTimestamp:
     def update(self, other):
         self.value = max(self.value, other.value) + 1
 
-    def happens_before(self, other):
-        # todo if values are equal, compare ids
-        return self.value < other.value
+    def __eq__(self, other):
+        return self.value == other.value
     
+    def __lt__(self, other):
+        return self.value < other.value
+
     def to_string(self):
         return str(self.value)
 

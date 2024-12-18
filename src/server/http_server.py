@@ -37,7 +37,8 @@ class Server:
             self.node.logger.log('SYNC request received')
             updates = request.get_json()
             timestamp = request.args.get('timestamp')
-            self.node.handle_sync(updates, timestamp)
+            source_id = request.args.get('source_id')
+            self.node.handle_sync(updates, timestamp, source_id)
             return jsonify({}), 202
 
     def run(self):

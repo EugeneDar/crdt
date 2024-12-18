@@ -31,17 +31,17 @@ class Node:
     def handle_patch(self, updates):
         with self.lock:
             self.timestamp.increment()
-            self.broadcast(updates, self.timestamp)
+            self.broadcast(updates, self.timestamp, self.id)
 
-    def handle_sync(self, updates, timestamp):
+    def handle_sync(self, updates, timestamp, source_id):
         timestamp = LamportTimestamp.from_string(timestamp)
         self.timestamp.update(timestamp)
         with self.lock:
             for key, value in updates.items():
-                self.storage.put(key, value, timestamp)
+                self.storage.put(key, value, timestamp, source_id)
 
-    def broadcast(self, updates, timestamp):
+    def broadcast(self, updates, timestamp, source_id):
         timestamp = timestamp.to_string()
         for address in cluster_info.get_all_addresses():
             self.logger.log(f'Sending updates to {address}')
-            self.http_client.queue_sync_request(address, updates, timestamp)
+            self.http_client.queue_sync_request(address, updates, timestamp, source_id)

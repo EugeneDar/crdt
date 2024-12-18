@@ -5,16 +5,12 @@ class Storage:
     def __init__(self):
         self.data = {}
 
-    def get(self, key):
-        state = self.data.get(key)
-        return state.value, state.timestamp if state else None, None
-
     def get_all(self):
         return {key: state.value for key, state in self.data.items()}
 
-    def put(self, key, value, timestamp):
+    def put(self, key, value, timestamp, source_id):
         state = self.data.get(key)
         if state:
-            state.update(value, timestamp)
+            state.update(value, timestamp, source_id)
         else:
-            self.data[key] = State(value, timestamp)
+            self.data[key] = State(value, timestamp, source_id)

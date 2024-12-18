@@ -1,7 +1,5 @@
 import requests
 import threading
-import json
-import time
 import queue
 
 class Client:
@@ -61,13 +59,13 @@ class Client:
             print(f"PATCH request failed: {e}")
             return False, None
 
-    def queue_sync_request(self, address, data, timestamp):
-        self.request_queue.put((address, data, timestamp))
+    def queue_sync_request(self, address, data, timestamp, source_id):
+        self.request_queue.put((address, data, timestamp, source_id))
 
-    def _send_sync_request(self, address, data, timestamp):
+    def _send_sync_request(self, address, data, timestamp, source_id):
         try:
             headers = {'Content-Type': 'application/json'}
-            params = {'timestamp': timestamp}
+            params = {'timestamp': timestamp, 'source_id': source_id}
             response = requests.put(self._create_url(address), json=data, headers=headers, params=params)
             response.raise_for_status()
             return True, response.json()
